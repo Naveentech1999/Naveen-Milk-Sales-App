@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#176b45"><title>Naveen Milk Sales Calculator</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#18352a;background:#f2f7f3}*{box-sizing:border-box}body{margin:0;padding:18px;max-width:760px;margin-inline:auto}header{background:#176b45;color:white;padding:22px;border-radius:20px;margin-bottom:16px}h1{font-size:1.55rem;margin:0 0 6px}header p{margin:0;opacity:.9}.card{background:white;border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 4px 18px #173b2410}h2{font-size:1.1rem;margin:0 0 14px}label{display:block;font-weight:650;font-size:.92rem;margin:10px 0 5px}input,select,button{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid #cbd9ce;background:white}button{background:#176b45;color:white;font-weight:700;border:0;margin-top:12px;cursor:pointer}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.result{font-size:1.25rem;font-weight:800;color:#176b45}.muted{color:#62746a;font-size:.9rem}.entry{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #e5eee7}.entry button{width:auto;padding:6px 10px;margin:0;background:#a12a2a}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:430px){.row{grid-template-columns:1fr}.actions{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header><h1>🥛 Naveen Milk Sales</h1><p>Daily sales calculator & invoice summary</p></header>
+<section class="card"><h2>Add milk sale</h2>
+<label for="brand">Milk brand</label><select id="brand"><option value="Jersey TM">Jersey TM</option><option value="Amul">Amul</option><option value="Heritage">Heritage</option><option value="Vijaya">Vijaya</option></select>
+<div class="row"><div><label for="type">Milk type</label><select id="type"><option value="33">Jersey TM — ₹33/L</option><option value="45">Full Cream — ₹45/L</option><option value="0">Other / custom rate</option></select></div><div><label for="rate">Rate (₹/L)</label><input id="rate" type="number" min="0" step=".5" value="33"></div></div>
+<div class="row"><div><label for="qty">Quantity (litres)</label><input id="qty" type="number" min=".01" step=".01" placeholder="e.g. 2" value="1"></div><div><label for="date">Sale date</label><input id="date" type="date"></div></div>
+<button id="add">Add sale</button></section>
+<section class="card"><h2>Today's summary</h2><div class="row"><div><div class="muted">Total litres</div><div class="result" id="litres">0.00 L</div></div><div><div class="muted">Total sales</div><div class="result" id="total">₹0.00</div></div></div><div id="entries" class="muted" style="margin-top:12px">No sales added yet.</div><div class="actions"><button id="export">Download invoice (CSV)</button><button id="clear" style="background:#a12a2a">Clear sales</button></div></section>
+<p class="muted">Sales are saved in this browser on this device. Export your invoice regularly for backup.</p>
+<script>
+const $=id=>document.getElementById(id);const today=new Date();$('date').value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+let sales=[];try{sales=JSON.parse(localStorage.getItem('naveenMilkSales')||'[]')}catch(e){sales=[]}
+$('type').addEventListener('change',()=>{if($('type').value!=='0')$('rate').value=$('type').value});
+function money(n){return '₹'+Number(n).toFixed(2)}
+function render(){const d=$('date').value;const list=sales.filter(s=>s.date===d);$('litres').textContent=list.reduce((a,s)=>a+s.qty,0).toFixed(2)+' L';$('total').textContent=money(list.reduce((a,s)=>a+s.qty*s.rate,0));$('entries').innerHTML=list.length?list.map(s=>'<div class="entry"><span><b>'+esc(s.brand)+'</b> · '+esc(s.qty)+' L × '+money(s.rate)+'<br><small>'+money(s.qty*s.rate)+'</small></span><button data-id="'+s.id+'">Delete</button></div>').join(''):'No sales for this date yet.';document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{sales=sales.filter(s=>s.id!==b.dataset.id);save();render()})}
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function save(){localStorage.setItem('naveenMilkSales',JSON.stringify(sales))}
+$('add').onclick=()=>{const qty=Number($('qty').value),rate=Number($('rate').value);if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(rate)||rate<0){alert('Enter a valid quantity and rate.');return}sales.push({id:Date.now().toString()+Math.random().toString(16).slice(2),brand:$('brand').value,type:$('type').value==='45'?'Full Cream':$('type').value==='33'?'Jersey TM':'Custom',qty,rate,date:$('date').value});save();render()};
+$('date').onchange=render;
+$('clear').onclick=()=>{if(confirm('Clear all saved sales from this browser?')){sales=[];save();render()}};
+$('export').onclick=()=>{const d=$('date').value,list=sales.filter(s=>s.date===d);if(!list.length){alert('No sales for this date to export.');return}const rows=[['Date','Brand','Milk type','Quantity (L)','Rate (INR/L)','Amount (INR)'],...list.map(s=>[s.date,s.brand,s.type,s.qty,s.rate,(s.qty*s.rate).toFixed(2)])];const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));a.download='milk-sales-'+d+'.csv';a.click();URL.revokeObjectURL(a.href)};
+render();
+</script></body></html>
